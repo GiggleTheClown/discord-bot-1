@@ -280,12 +280,6 @@ async def on_message(message):
 #
 #
 #
-        if "nig" in message.content or "NIG" in message.content or "cat" in message.content or "CAT" in message.content:
-            embed = discord.Embed(title="Nigga Cat",color=random.randint(0, 0xFFFFFF))
-            embed.add_field(name="\u200b", value="AnythingTypeBeats on the beat, bitch!Who the fuck is callin' me?\n\nNigga (Ooh!)\nNigga cat\nNigga cat (Ooh!)\nNigga, nigga (Ooh!)\nNigga cat\nNigga cat (Ooh!)\nNigga, nigga (Ooh!)\nNigga cat\nNigga cat (Ooh!)\nNigga, nigga (Ooh!)\nNigga cat\nNigga cat (Ooh!)\nNigga cat\nNigga, nigga (Ooh!)\n(Ooh!)", inline=False)
-            embed.set_footer(text="AnythingTypeBeats")
-            await message.channel.send(embed=embed)
-#
 #
 #
         if message.content.startswith('!add'):
