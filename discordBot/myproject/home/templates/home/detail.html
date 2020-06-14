@@ -1,0 +1,49 @@
+{%extends "home/base.html"%}
+
+    {%block content%}
+
+
+
+        <div id="personalLevelingDiv">
+
+            {% for i in dict%}
+                <div class="personalLevelingDiv">
+                    <h3 id=personalRankText> <b> #{{ i.rank }}&nbsp; </b> </h3>
+                </div>
+                <img id="pfpImage" src="{{i.user_avatar_url}}" alt="">
+
+                <div class="personalLevelingDiv">
+                    <a class="scoreboardLink" href="/person/{{ i.user_id }}">
+                        <h3 class="levelingText"> {{ i.username }}  <br> <small class="smallLevelingText"> <{{ i.user_id }}> </small> </h3>
+                    </a>
+                </div>
+                <div class="personalLevelingDiv">
+                        <h3 class="levelingText">Level - {{ i.level }}&nbsp;&nbsp; <br> <small class="smallLevelingText" id=expText> <{{ i.exp }} / {{i.maxXp}}> </small> </h3>
+                </div>
+                <div class="personalLevelingDiv">
+                    <h3 class="levelingText">Messages - {{ i.msges_sent }}  <br> </h3>
+                </div>
+
+
+
+
+                <!-- <span class="personalLevelingSpan">
+                    <h2 class="levelingText">{{ i.username }}</h2>
+                    <small class="smallLevelingTex"> <{{ i.user_id }}> </small>
+                </span>
+                <span class="personalLevelingSpan" id=levelingSpan>
+                    <h4 class="levelingText">Level - {{i.level}}</h4>
+                </span> -->
+
+
+
+            {% endfor %}
+
+        </div>
+
+
+
+
+
+
+    {%endblock content%}

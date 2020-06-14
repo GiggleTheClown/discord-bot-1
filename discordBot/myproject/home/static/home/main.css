@@ -1,0 +1,129 @@
+body{
+    background-color: #2C2F33;
+}
+
+.navbar{
+    position: fixed;
+    background-color: #7289DA;
+    width: 100%;
+    top: 0%;
+    height: 7%;
+}
+
+.navbarCell{
+    text-align: center;
+}
+
+
+.navbarLink{
+    text-decoration: none;
+    color: white;
+}
+
+.navbarBox{
+    background-color:  	#23272a;
+}
+
+.scoreboardTable{
+    border: 1px solid white;
+    background-color: #2e3438;
+}
+
+.scoreboardPfpImges{
+    border-radius: 50%;
+    max-width: 40%;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
+
+.scoreboardDiv{
+
+    padding-top: 5%;
+    padding-left: 24%;
+    padding-right: 24%;
+    padding-bottom: 5%;
+}
+
+.scoreboardText{
+    text-align: center;
+    color: white;
+}
+
+.scoreboardCell{
+    width: 15%;
+}
+
+.levelingInfoDiv{
+    position: relative;
+    border: 1px solid white;
+    background-color: #2e3438;
+    margin-left: 90%;
+    height: 100%;
+    text-align: center;
+    color: lightgray;
+}
+
+.scoreboardLink{
+    text-decoration: none;
+    color: white;
+}
+
+#personalLevelingDiv{
+    display: inline-block;
+    background-color: #2e3438;
+    border: 1px solid white;
+    position: fixed;
+    top: 20em;
+    bottom: 0;
+    left: 25em;
+    height: 7em;
+}
+
+
+.smallLevelingText{
+    padding-left: 2em;
+    padding-right: 2em;
+    vertical-align: top;
+    color: lightgray;
+    font-size: 0.6em;
+}
+
+.personalLevelingDiv{
+    vertical-align: top;
+    height: 7em;
+    display: inline-block;
+    background-color: #2e3438;
+}
+
+#pfpImage{
+    max-height: 7em;
+    margin-left: auto;
+    margin-right: auto;
+    display: inline-block;
+}
+
+.levelingText{
+
+    vertical-align: top;
+    color: white;
+    text-align: top;
+    text-align: center;
+
+    display: inline-block;
+}
+
+#levelingSpan{
+    padding-top: 5em;
+}
+
+#expText{
+    font-size: 0.7em;
+}
+
+#personalRankText{
+    padding-top: 1em;
+    vertical-align: middle;
+    text-align: center;
+    color: white;
+}

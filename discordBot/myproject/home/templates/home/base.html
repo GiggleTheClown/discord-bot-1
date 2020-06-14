@@ -1,0 +1,45 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+
+
+        <link rel="stylesheet" type="text/css" href="{% static 'home/main.css'%}">
+
+
+    </head>
+    <body>
+        <div class=navbarBox>
+            <table class=navbar>
+                <tr>
+
+                    <td class=navbarCell>
+                        <a class=navbarLink href="{% url 'home' %}"> <p> <b>Home</b> </p> </a>
+                    </td>
+
+                    <td class=navbarCell>
+                        <a class=navbarLink href="{% url 'moderation' %}"> <p> <b>Moderation</b> </p> </a>
+                    </td>
+
+                    <td class=navbarCell>
+                        <a class=navbarLink href="{% url 'levels' %}"> <p> <b>Leveling</b> </p> </a>
+                    </td>
+
+                    <td class=navbarCell>
+                        <a class=navbarLink href="{% url 'currency' %}"> <p> <b>Currency</b> </p> </a>
+                    </td>
+
+                    <td class=navbarCell>
+                        <a class=navbarLink href="{% url 'currency' %}"> <p> <b>Login</b> </p> </a>
+                    </td>
+
+                </tr>
+            </table>
+        </div>
+
+        <div>
+            {% block content %}{%endblock%}
+        </div>
+
+    </body>
+</html>

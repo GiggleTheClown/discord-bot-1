@@ -1,0 +1,39 @@
+{%extends "home/base.html"%}
+
+    {%block content%}
+
+        <h1 class="scoreboardText" style="padding-top: 10%"> <b> Scoreboard </b> </h1>
+
+        <div class="scoreboardDiv">
+
+            <table class="scoreboardTable">
+
+                <tr>
+                    <th class="scoreboardCell"><p class="scoreboardText">rank</p></td>
+                    <th class="scoreboardCell"><p class="scoreboardText">image</p></th>
+                    <th class="scoreboardCell"> <p class="scoreboardText">username&tag</p> </th>
+                    <th class="scoreboardCell"><p class="scoreboardText">messages sent</p></th>
+                    <th class="scoreboardCell"><p class="scoreboardText">level</p></th>
+                </tr>
+            {% for i in dict%}
+                <tr>
+                    <th class="scoreboardCell"><p class="scoreboardText">{{i.rank}}</p></th>
+                    <td class="scoreboardCell"> <img class="scoreboardPfpImges" src="{{i.user_avatar_url}}"> </td>
+                    <th class="scoreboardCell"> <a class="scoreboardLink" href="/person/{{ i.user_id }}"> <p class="scoreboardText">{{i.username}} </p> </a> </th>
+                    <td class="scoreboardCell"><p class="scoreboardText">{{i.msges_sent}}</p></td>
+                    <td class="scoreboardCell">
+                        <p class="scoreboardText">{{i.level}}</p>
+                    </td>
+                </tr>
+
+            {% endfor %}
+
+            </table>
+        </div>
+
+
+
+
+
+
+    {%endblock content%}
