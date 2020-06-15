@@ -1,4 +1,4 @@
-# Discord bot with a website
+
 web framework - Django 3.0.6
 
 database - 10.4.13-MariaDB 
