@@ -127,7 +127,7 @@ for i in rows:
     levelingList.append(ConvertToDict(keys, i))
 
 
-token = "Im a fake"
+token = "NzAzMzM1Mjg0MjEzMDIyODEy.XuZQMw.wkna9KnENg-_T3lbUr7GyWZ7yjc"
 
 client = discord.Client()
 id = client.get_guild(548520910764769280)
@@ -307,11 +307,10 @@ async def on_message(message):
                                 level["maxXp"] += IncreaseMaxExp(level["maxXp"])
 
                     if "remove" in message.content:
-                        if userMsgList[2] != "exp":
-                            level[userMsgList[2]] -= int(userMsgList[1])
+                        level[userMsgList[2]] -= int(userMsgList[1])
 
-                            if level[userMsgList[2]] < 0:
-                                level[userMsgList[2]] = 0
+                        if level[userMsgList[2]] < 0:
+                            level[userMsgList[2]] = 0
                         # when removing levels decrease maxXp and negate exp
                         if userMsgList[2] == "level":
                             for b in range(int(userMsgList[1])):
@@ -323,24 +322,24 @@ async def on_message(message):
                             level["exp"] = 0
                         # when removing exp, lower levels and maxXp
                         if userMsgList[2] == "exp":
-                            userMsgList[1] = int(userMsgList[1]) - level["exp"]
-                            if int(userMsgList[1]) > 0:
-                                level["maxXp"] -= IncreaseMaxExp(level["maxXp"])
+                            userMsgList[1] = int(userMsgList[1])
+                            if userMsgList[1] > 0:
+                                level["maxXp"] -= IncreaseMaxExp(level["maxXp"]-1)
                                 level["level"] -= 1
-                            while int(userMsgList[1]) >= level["maxXp"]:
-                                userMsgList[1] = int(userMsgList[1]) - level["maxXp"]
-                                level["maxXp"] -= IncreaseMaxExp(level["maxXp"])
+
+                            while userMsgList[1] > level["maxXp"]:
+                                userMsgList[1] -= level["maxXp"]
+                                level["maxXp"] -= IncreaseMaxExp(level["maxXp"]-1)
                                 level["level"] -= 1
                                 if level["maxXp"] < 0:
                                     level["maxXp"] = 25
                                     userMsgList[1] = 25
                                     break
-                            level["exp"] = level["maxXp"] - int(userMsgList[1])
+                            level["exp"] = level["maxXp"] - userMsgList[1]
                             if level["exp"] < 0:
                                 level["exp"] = 0
 
                     # save changes
-
                     levelingList[i] = level
 
                     if SortListOfDict():
