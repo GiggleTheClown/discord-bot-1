@@ -6,58 +6,42 @@ import os
 import threading
 
 
-def lookForUser():
-
-    cursor.execute(look % author)
-    if cursor.fetchone()[0]:
-        return 1
-    else:
-        return 0
+def BackupDatabase():
+    os.system('mysqldump -u %s -p%s %s > backup.sql' % (user, password, database))
+    print("Backup done")
+    timer = threading.Timer(10000.0, BackupDatabase())
+    timer.start()
 
 
-def getMsges():
-    cursor.execute(getAmountOfMsg % author)
-    return cursor.fetchone()[0]
+def ConvertToDict(keys, values):
+    return dict(zip(keys, values))
 
 
-def updateMsges():
-    if lookForUser():
-        cursor.execute(updateMsg % (getMsges()+1, author))
-        if(username != getUsername()):
-            cursor.execute(updateUserTag % (username, author))
-        if(pic_url != getPicUrl()):
-            cursor.execute(updateAvatarUrl % (pic_url, author))
-    else:
-        cursor.execute(insert % (author, 1, 0, 100, 0, username, 0, pic_url))  # Starting values for the database
+def UpdateLevelingTableRow(levelingListRow):
+    for level in levelingList:
+        if levelingListRow["user_id"] == level["user_id"]:
+            for i in keys:
+                cursor.execute("UPDATE levels_table SET %s = '%s' WHERE user_id = %s " % (i, level[i], level["user_id"]))
+            mariadb_connection.commit()
+            return
 
+
+def UpdateLevelingTable():
+    for level in levelingList:
+        for i in keys:
+            cursor.execute("UPDATE levels_table SET %s = '%s' WHERE user_id = %s" % (i, level[i], level["user_id"]))
     mariadb_connection.commit()
-    addRanks()
 
 
-def updateXP(msgLen):
+def ExpGain(msgLen):
     random.seed(datetime.now())
     try:
-        cursor.execute(updateExp % (getXp()+random.randint(1, deteriorateXp(msgLen)), author))
+        return random.randint(1, DeteriorateXp(msgLen))
     except ValueError:
-        cursor.execute(updateExp % (getXp()+random.randint(1, 15), author))
-
-    mariadb_connection.commit()
-
-    if checkForLvlUp():
-        cursor.execute(updateExp % (getXp()-getMaxXp(), author))
-        cursor.execute(updateLevel % (getLvl()+1, author))
-        maxXp = getMaxXp()
-        cursor.execute(updateMaxExp % (maxXp+25, author))
-
-        mariadb_connection.commit()
+        return random.randint(1, 15)
 
 
-def getXp():
-    cursor.execute(getAmountOfXP % author)
-    return cursor.fetchone()[0]
-
-
-def deteriorateXp(msgLen):
+def DeteriorateXp(msgLen):
     if msgLen <= 5:
         return msgLen
     elif msgLen <= 30:
@@ -70,68 +54,36 @@ def deteriorateXp(msgLen):
         return int(msgLen/10)
 
 
-def checkForLvlUp():
-    if getXp() >= getMaxXp():
-        return 1
-    else:
-        return 0
+def IncreaseMaxExp(previousMaxExp):  # WIP - more comlex system
+    return 25
 
 
-def getLvl():
-    cursor.execute(getLevel % author)
-    return cursor.fetchone()[0]
+def SortListOfDict(): # Bubble sort used because assuming everyhing is sorted, its the fastest
+    n = len(levelingList)
+    returnval = 0
+
+    for i in range(n-1):
+
+        for j in range(0, n-i-1):
+
+            if (levelingList[j]["level"] < levelingList[j+1]["level"]) or (levelingList[j]["level"] == levelingList[j+1]["level"] and levelingList[j]["exp"] < levelingList[j+1]["exp"]):
+                levelingList[j], levelingList[j+1] = levelingList[j+1], levelingList[j]
+                returnval = 1
+    return returnval
 
 
-def getMaxXp():
-    cursor.execute(getMaxExp % author)
-    return cursor.fetchone()[0]
-
-
-def getUsername():
-    cursor.execute(getUserTag % author)
-    return cursor.fetchone()[0]
-
-
-def addRanks():
-    cursor.execute("SELECT user_id FROM levels_table ORDER BY level DESC, exp DESC, msges_sent DESC")
-    result = cursor.fetchall()
-    for b, x in enumerate(result):
-        for t in x:
-            cursor.execute("UPDATE levels_table SET rank = %s WHERE user_id = '%s'" % (b+1, t))
-    mariadb_connection.commit()
-
-
-def getPicUrl():
-    cursor.execute(getAvatarUrl % author)
-    return cursor.fetchone()[0]
-
-
-def backupDatabase():
-    os.system('mysqldump -u %s -p%s %s > backup.sql' % (user, password, database))
-    print("Backup done")
-    timer = threading.Timer(120.0, backupDatabase)
-    timer.start()
+def AddRanks():
+    for i, level in enumerate(levelingList, 1):
+        levelingList[i-1]["rank"] = i
 
 
 
-look = "SELECT COUNT(1) user_id FROM levels_table WHERE user_id = '%s'"
-insert = "INSERT INTO levels_table (user_id, msges_sent, exp, maxXp, level, username, rank, user_avatar_url) VALUES ('%s', %s, %s, %s, %s, '%s', %s, '%s')"
-getAmountOfMsg = "SELECT msges_sent FROM levels_table WHERE user_id = '%s'"
-updateMsg = "UPDATE levels_table SET  msges_sent = %s WHERE user_id = '%s'"
-printLevel = "SELECT * FROM levels_table WHERE user_id = '%s'"
-getAmountOfXP = "SELECT exp FROM levels_table WHERE user_id = '%s'"
-updateExp = "UPDATE levels_table SET exp = %s WHERE user_id = '%s'"
-getLevel = "SELECT level FROM levels_table WHERE user_id = '%s'"
-updateLevel = "UPDATE levels_table SET level = %s WHERE user_id = '%s'"
-getMaxExp = "SELECT maxXp FROM levels_table WHERE user_id = '%s'"
-updateMaxExp = "UPDATE levels_table SET maxXp = %s WHERE user_id = '%s'"
-getUserTag = "SELECT username FROM levels_table WHERE user_id = '%s'"
-updateUserTag = "UPDATE levels_table SET username = '%s' WHERE user_id = '%s'"
-getAvatarUrl = "SELECT user_avatar_url FROM levels_table WHERE user_id = '%s'"
-updateAvatarUrl = "UPDATE levels_table SET user_avatar_url = '%s' WHERE user_id = '%s'"
 user = 'root'
 password = 'root'
 database = 'test'
+
+
+# Check if database exists - if it doesn't create new and sync with backup
 
 try:
     mariadb_connection = mariadb.connect(
@@ -160,95 +112,103 @@ except mariadb.errors.ProgrammingError:
 
 
 cursor = mariadb_connection.cursor()
-cursor = mariadb_connection.cursor(buffered=True)
-token = "NzAzMzM1Mjg0MjEzMDIyODEy.XqNyJg.mIJcZ0Hf1upT3QJfQQe4CF9jl7w"
+
+insert = "INSERT INTO levels_table (user_id, msges_sent, exp, maxXp, level, username, rank, user_avatar_url) VALUES ('%s', %s, %s, %s, %s, '%s', %s, '%s')"
+
+# Create a dictonary with all the info from levels_table
+
+cursor.execute("SELECT * FROM levels_table ORDER BY rank ASC")
+rows = cursor.fetchall()
+global keys
+keys = ['user_id', 'msges_sent', 'exp', 'maxXp', 'level', 'username', 'rank', 'user_avatar_url']
+global levelingList
+levelingList = []
+for i in rows:
+    levelingList.append(ConvertToDict(keys, i))
+
+
+token = "Im a fake"
 
 client = discord.Client()
 id = client.get_guild(548520910764769280)
 
-timer = threading.Timer(69.0, backupDatabase)
+timer = threading.Timer(10000.0, BackupDatabase)
 timer.start()
-
 
 @client.event
 async def on_message(message):
-    global author
-    global username
-    global pic_url
-    author = message.author.id
-    try:
-        pic_url = str(message.author.avatar_url)
-    except TypeError:
-        print("errors")
-        pic_url = "error lol"
+    # Update msges_sent, exp, maxXp. level, rank, user_avatar_url in levels_table for user_id
+    for i, level in enumerate(levelingList):
+        if level["user_id"] == str(message.author.id):
+            try:
+                level["user_avatar_url"] = str(message.author.avatar_url)
+            except TypeError:
+                level["user_avatar_url"] = "-1"
+            level["msges_sent"] += 1
+            level["exp"] += ExpGain(len(message.content))
+            if level["exp"] >= level["maxXp"]:
+                level["level"] += 1
+                await message.channel.send("%s is now level %s" % ("<@"+level["user_id"]+">", level["level"]))
+                level["exp"] -= level["maxXp"]
+                level["maxXp"] += IncreaseMaxExp(level["maxXp"])
+            levelingList[i] = level
+            if SortListOfDict():
+                AddRanks()
+                UpdateLevelingTable()
+            else:
+                UpdateLevelingTableRow(levelingList[i])
 
-    username = str(message.author)
-    try:
-        old_level = getLvl()
-    except TypeError:
-        old_level = 0
-    updateMsges()
-    updateXP(len(message.content))
-    new_lvl = getLvl()
-    if old_level != new_lvl:
-        await message.channel.send("%s leveld up to %s" % ("<@"+str(author)+">", new_lvl))
+        # Create user if doesnt exist
 
+        if i == len(levelingList):
+            cursor.execute(insert % (message.author.id, 1, 0, 100, 0, str(message.author), 0, '-1'))
+            mariadb.commit()
+            mem = {"user_id": message.author.id, "msges_sent": 1, "exp": 0, "maxXp": 100, "level": 0, "username": str(message.author), "rank": len(levelingList)+1, "user_avatar_url": -1}
+            levelingList.append(mem)
 
-    if message.author != client.user:
-#
-#
-#
-        if message.content.startswith('!scoreboard'):
-            cursor.execute("SELECT * FROM levels_table ORDER BY level DESC, exp DESC, msges_sent DESC")
+    # diffrent commands
+
+    if message.author != client.user:  # so that bot cant use own commands
+
+        if message.content == "!scoreboard":
             embed = discord.Embed(title="!scoreboard", description="shows the top 5 users", color=random.randint(0, 0xFFFFFF))
-            result = cursor.fetchall()
-            for b, x in enumerate(result):
-                if b == 5:
+            for i, level in enumerate(levelingList):
+                if i == 5:
                     break
-                list_result = []
-                for t in x:
-                    list_result.append(t)
-                embed.add_field(name=list_result[5], value="rank - %s l‎evel - %s xp - %s/%s" % ("#"+str(list_result[6]), str(list_result[4]), str(list_result[2]), str(list_result[3])), inline=False)
+                embed.add_field(name=level["username"], value="rank - %s l‎evel - %s xp - %s/%s" % ("#"+str(level["rank"]), str(level["level"]), str(level["exp"]), str(level["maxXp"])), inline=False)
             await message.channel.send(embed=embed)
 #
 #
 #
-        if message.content.startswith('!level'):
-
-            if message.content == '!level':
-                cursor.execute(printLevel % message.author.id)
-
+        if message.content.startswith("!level") or message.content.startswith("!rank"):
+            level = {}
+            if message.content == "!level" or message.content == "!rank":
+                for level in levelingList:
+                    if level["user_id"] == str(message.author.id):
+                        break
             else:
-                cursor.execute("SELECT username FROM levels_table")
-                result = cursor.fetchall()
                 try:
-                    for b in result:
-                        for t in b:
-                            if t in str(message.mentions[0]):
-                                cursor.execute("SELECT * FROM levels_table WHERE username = '%s'" % t)
+                    for level in levelingList:
+                        if level["username"] == str(message.mentions[0]):
+                            break
+
                 except IndexError:
                     error = discord.Embed(title="IndexError", description="Invalid username", color=0xda000f)
                     error.set_footer(text="Raised when a sequence subscript is out of range. (Slice indices are silently truncated to fall in the allowed range; if an index is not a plain integer, TypeError is raised.)")
                     await message.channel.send(embed=error)
-                    return 0
+                    return
 
-            result = cursor.fetchall()
-            list_result = []
             try:
-                for i in result:
-                    for t in i:
-                        list_result.append(t)
-                list_result[0] = "<@" + list_result[0] + ">"
                 embed = discord.Embed(title="!level", description="Shows level info‏‏‎‎", color=random.randint(0, 0xFFFFFF))
-                embed.set_author(name=list_result[5])
-                embed.set_thumbnail(url=list_result[7])
-                embed.add_field(name="rank‏‏‎ ‎‏‏‎ ‎", value="#"+str(list_result[6]), inline=True)
-                embed.add_field(name="lvl", value=list_result[4], inline=True)
+                embed.set_author(name=level["username"])
+                embed.set_thumbnail(url=level["user_avatar_url"])
+                embed.add_field(name="rank‏‏‎ ‎‏‏‎ ‎", value="#"+str(level["rank"]), inline=True)
+                embed.add_field(name="lvl", value=level["level"], inline=True)
                 embed.add_field(name="\u200b", value="\u200b", inline=True)
-                embed.add_field(name="msgs‏‏‎ ‎‏‏‎ ‎", value=list_result[1], inline=True)
-                embed.add_field(name="exp", value=str(list_result[2])+"/"+str(list_result[3]), inline=True)
+                embed.add_field(name="msgs‏‏‎ ‎‏‏‎ ‎", value=level["msges_sent"], inline=True)
+                embed.add_field(name="exp", value=str(level["exp"])+"/"+str(level["maxXp"]), inline=True)
                 embed.add_field(name="\u200b", value="\u200b", inline=True)
-                embed.set_footer(text=list_result[0])
+                embed.set_footer(text="<@%s>" % (level["user_id"]))
             except IndexError:
                 error = discord.Embed(title="IndexError", description="User doesn't exist in levels_table", color=0xda000f)
                 error.set_footer(text="Raised when a sequence subscript is out of range. (Slice indices are silently truncated to fall in the allowed range; if an index is not a plain integer, TypeError is raised.")
@@ -257,111 +217,146 @@ async def on_message(message):
 
             try:
                 await message.channel.send(embed=embed)
-            except discord.errors.HTTPException or IndexError or UnboundLocalError:
+            except discord.errors.HTTPException or IndexError or UnboundLocalError:  # bad avatar url
                 error = discord.Embed(title="discord.errors.HTTPException: 400 Bad Request (error code: 50035)", description="Unsupported url type ", color=0xda000f)
                 error.set_footer(text="Invalid Form Body In embed.thumbnail.url: Not a well formed URL.")
                 await message.channel.send(embed=error)
 
                 embed = discord.Embed(title="!level", description="Shows level info‏‏‎‎", color=random.randint(0, 0xFFFFFF))
-                embed.set_author(name=list_result[5])
-                embed.add_field(name="rank‏‏‎ ‎‏‏‎ ‎", value="#"+str(list_result[6]), inline=True)
-                embed.add_field(name="lvl", value=list_result[4], inline=True)
+                embed.set_author(name=level["username"])
+                embed.add_field(name="rank‏‏‎ ‎‏‏‎ ‎", value="#"+str(level["rank"]), inline=True)
+                embed.add_field(name="lvl", value=level["level"], inline=True)
                 embed.add_field(name="\u200b", value="\u200b", inline=True)
-                embed.add_field(name="msgs‏‏‎ ‎‏‏‎ ‎", value=list_result[1], inline=True)
-                embed.add_field(name="exp", value=str(list_result[2])+"/"+str(list_result[3]), inline=True)
+                embed.add_field(name="msgs‏‏‎ ‎‏‏‎ ‎", value=level["msges_sent"], inline=True)
+                embed.add_field(name="exp", value=str(level["exp"])+"/"+str(level["maxXp"]), inline=True)
                 embed.add_field(name="\u200b", value="\u200b", inline=True)
-                embed.set_footer(text=list_result[0])
+                embed.set_footer(text="<@%s>" % (level["user_id"]))
                 try:
                     await message.channel.send(embed=embed)
                 except IndexError:
                     error = discord.Embed(title="IndexError", description="User doesn't exist in the databe", color=0xda000f)
                     error.set_footer(text="Raised when a sequence subscript is out of range. (Slice indices are silently truncated to fall in the allowed range; if an index is not a plain integer, TypeError is raised.)")
                     await message.channel.send(embed=error)
-#
-#
-#
-#
-#
-        if message.content.startswith('!add'):
+
+        if message.content.startswith("!add") or message.content.startswith("!remove"):
             if getattr(message.author.guild_permissions, "administrator"):
-                list_result = message.content.split()
-                if len(list_result) == 4:
+                # [0] = !add, [1] = amount, [2] = category, [3] mention
+                userMsgList = message.content.split()
+
+                if len(userMsgList) == 4:
+                    # check [1]
                     try:
-                        int(list_result[1])
-                    except ValueError:
-                        error = discord.Embed(title="Invalid parameter %s" % list_result[1], description="Must be a whole positive integer", color=0xda000f)
-                        error.set_footer(text="!add <number> <category> <@person>")
+                        int(userMsgList[1])
+                    except TypeError or ValueError:
+                        error = discord.Embed(title="Invalid parameter %s" % userMsgList[1], description="Must be a whole positive integer", color=0xda000f)
+                        error.set_footer(text="<command name> <number> <category> <@person>")
                         await message.channel.send(embed=error)
-                        return 0
+                        return
 
-                    valid_categories = ('exp', 'level')
-
-                    if list_result[2] not in valid_categories:
-                        error = discord.Embed(title="Invalid parameter %s" % list_result[2], description="Must be 'level' or 'exp'", color=0xda000f)
-                        error.set_footer(text="!add <number> <category> <@person>")
+                    if int(userMsgList[1]) <= 0:
+                        error = discord.Embed(title="Invalid parameter %s" % userMsgList[1], description="Must be a whole positive integer", color=0xda000f)
+                        error.set_footer(text="<command name> <number> <category> <@person>")
                         await message.channel.send(embed=error)
-                        return 0
+                        return
+                    # check [2]
+                    validCategories = ["exp", "level", "msges_sent"]
+                    if userMsgList[2] not in validCategories:
+                        error = discord.Embed(title="Invalid parameter %s" % userMsgList[2], description="Must be 'level', 'exp' or 'msges_sent'", color=0xda000f)
+                        error.set_footer(text="<command name> <number> <category> <@person>")
+                        await message.channel.send(embed=error)
+                        return
+                    # check [3]
                     try:
                         message.mentions[0]
                     except IndexError:
-                        error = discord.Embed(title="Invalid parameter %s" % list_result[3], description="Must be a mention. \n ps: you can't copy mentions", color=0xda000f)
-                        error.set_footer(text="!add <number> <category> <@person>")
+                        error = discord.Embed(title="Invalid parameter %s" % userMsgList[3], description="Must be a mention. \n ps: you can't copy mentions", color=0xda000f)
+                        error.set_footer(text="<command name> <number> <category> <@person>")
                         await message.channel.send(embed=error)
                         return 0
 
-
-                    cursor.execute("SELECT username from levels_table")
-                    result = cursor.fetchall()
-                    try:
-                        for b in result:
-                            for t in b:
-                                if t in str(message.mentions[0]):
-                                    cursor.execute("SELECT user_id FROM levels_table WHERE username = '%s'" % str(t))
-                                    res = cursor.fetchone()
-                                    for a in res:
-                                        list_result[3] = a
-                    except IndexError:
-                        error = discord.Embed(title="IndexError", description="Invalid username", color=0xda000f)
-                        error.set_footer(text="Raised when a sequence subscript is out of range. (Slice indices are silently truncated to fall in the allowed range; if an index is not a plain integer, TypeError is raised.)")
+                    level = {}
+                    check3 = 0
+                    for i, level in enumerate(levelingList):
+                        if str(message.mentions[0]) == level["username"]:
+                            check3 = 1
+                            break
+                    if check3 == 0:
+                        error = discord.Embed(title="Invalid parameter %s" % userMsgList[3], description="User doesn't exist in database \n ps: you can't copy mentions", color=0xda000f)
+                        error.set_footer(text="<command name> <number> <category> <@person>")
                         await message.channel.send(embed=error)
-                        return 0
+                        return
 
-                    cursor.execute("SELECT %s FROM levels_table WHERE user_id = '%s'" % (list_result[2], list_result[3]))
-                    res = cursor.fetchone()
-                    for a in res:
-                        list_result[0] = int(list_result[1])+a # From command name list_result switches to updated amount
-                    if list_result[2] == 'level':
-                        cursor.execute("UPDATE levels_table SET %s = %s WHERE user_id = '%s'" % (list_result[2], list_result[0], list_result[3]))
-                        mariadb_connection.commit()
-                        cursor.execute(getMaxExp % list_result[3])
+                    del check3
 
-                        b = cursor.fetchone()[0]
-                        for i in range(0, int(list_result[1])):
-                            b += 25
-                        cursor.execute("UPDATE levels_table SET maxXp = %s WHERE user_id = '%s'" % (b, list_result[3]))
+                    # add/remove to levelingList and databases and polish diffrent scenarios
+                    if "add" in message.content:
+                        level[userMsgList[2]] += int(userMsgList[1])
 
-                    elif list_result[2] == 'exp':
-                        cursor.execute(getMaxExp % list_result[3])
-                        b = cursor.fetchone()[0]
-                        added_lvls = 0
-                        while list_result[0] >= b:
-                            list_result[0] -= b
-                            b+=25
-                            added_lvls += 1
-                        cursor.execute("UPDATE levels_table SET maxXp = %s WHERE user_id = '%s'" % (b, list_result[3]))
-                        cursor.execute("UPDATE levels_table SET exp = %s WHERE user_id = '%s'" % (list_result[0], list_result[3]))
-                        cursor.execute("SELECT level FROM levels_table WHERE user_id = '%s'" % list_result[3])
-                        current_level = cursor.fetchone()[0]
-                        cursor.execute("UPDATE levels_table SET level = %s WHERE user_id = '%s'" % (current_level+added_lvls, list_result[3]))
+                    # increase maxXp if added levels
 
-                    mariadb_connection.commit()
+                        if userMsgList[2] == "level":
+                            for b in range(int(userMsgList[1])):
+                                level["maxXp"] += IncreaseMaxExp(level["maxXp"])
 
-                    await message.channel.send("added %s %s to <@%s>" % (list_result[2], list_result[1], list_result[3]))
-                else:
-                    if len(list_result) < 4:
-                        error = discord.Embed(title="Not enough parameters", description="'!add' command needs 3 parameters", color=0xda000f)
+                    # see if new exp causes leveling up
+
+                        if userMsgList[2] == "exp":
+                            while level["exp"] >= level["maxXp"]:
+                                level["level"] += 1
+                                level["exp"] -= level["maxXp"]
+                                level["maxXp"] += IncreaseMaxExp(level["maxXp"])
+
+                    if "remove" in message.content:
+                        if userMsgList[2] != "exp":
+                            level[userMsgList[2]] -= int(userMsgList[1])
+
+                            if level[userMsgList[2]] < 0:
+                                level[userMsgList[2]] = 0
+                        # when removing levels decrease maxXp and negate exp
+                        if userMsgList[2] == "level":
+                            for b in range(int(userMsgList[1])):
+                                level["maxXp"] -= IncreaseMaxExp(level["maxXp"]-1)
+                                if level["maxXp"] < 0:
+                                    level["maxXp"] = 0
+                                    break
+
+                            level["exp"] = 0
+                        # when removing exp, lower levels and maxXp
+                        if userMsgList[2] == "exp":
+                            userMsgList[1] = int(userMsgList[1]) - level["exp"]
+                            if int(userMsgList[1]) > 0:
+                                level["maxXp"] -= IncreaseMaxExp(level["maxXp"])
+                                level["level"] -= 1
+                            while int(userMsgList[1]) >= level["maxXp"]:
+                                userMsgList[1] = int(userMsgList[1]) - level["maxXp"]
+                                level["maxXp"] -= IncreaseMaxExp(level["maxXp"])
+                                level["level"] -= 1
+                                if level["maxXp"] < 0:
+                                    level["maxXp"] = 25
+                                    userMsgList[1] = 25
+                                    break
+                            level["exp"] = level["maxXp"] - int(userMsgList[1])
+                            if level["exp"] < 0:
+                                level["exp"] = 0
+
+                    # save changes
+
+                    levelingList[i] = level
+
+                    if SortListOfDict():
+                        AddRanks()
+                        UpdateLevelingTable()
                     else:
-                        error = discord.Embed(title="Too many parameters", description="'!add' command needs 3 parameters", color=0xda000f)
+                        UpdateLevelingTableRow(levelingList[i])
+
+                    await message.channel.send("success")
+
+
+                else:
+                    if len(userMsgList) < 4:
+                        error = discord.Embed(title="Not enough parameters", description="'!add' command uses 3 parameters", color=0xda000f)
+                    else:
+                        error = discord.Embed(title="Too many parameters", description="'!add' command uses 3 parameters", color=0xda000f)
                     error.set_footer(text="!add <number> <category> <@person>")
                     await message.channel.send(embed=error)
                     return 0
@@ -370,168 +365,103 @@ async def on_message(message):
                 error.set_footer(text="!add <number> <category> <@person>")
                 await message.channel.send(embed=error)
                 return 0
-#
-#
-#
-        if message.content.startswith('!remove'):
+
+        if message.content.startswith("!clear"):
+            # [1] = category, [2] = @mention
+
             if getattr(message.author.guild_permissions, "administrator"):
-                list_result = message.content.split()
-                if len(list_result) == 4:
-                    try:
-                        int(list_result[1])
-                    except ValueError:
-                        error = discord.Embed(title="Invalid parameter %s" % list_result[1], description="Must be a whole positive integer", color=0xda000f)
-                        error.set_footer(text="!remove <number> <category> <@person>")
+                userMsgList = message.content.split()
+                if len(userMsgList) == 3:
+                    # [1] check
+                    validCategories = ["msges_sent", "exp", "level", "all"]
+                    if userMsgList[1] not in validCategories:
+                        error = discord.Embed(title="Invalid parameter %s" % userMsgList[1], description="Must be 'level', 'exp' or 'msges_sent'", color=0xda000f)
+                        error.set_footer(text="<command name> <category> <@person>")
                         await message.channel.send(embed=error)
-                        return 0
+                        return
 
-                    valid_categories = ('exp', 'level')
+                    # [2] check
+                    if userMsgList[2] != "all":
+                        try:
+                            message.mentions[0]
+                        except IndexError:
+                            error = discord.Embed(title="Invalid parameter %s" % userMsgList[2], description="Must be a mention. \n ps: you can't copy mentions", color=0xda000f)
+                            error.set_footer(text="<command name> <category> <@person>")
+                            await message.channel.send(embed=error)
+                            return
 
-                    if list_result[2] not in valid_categories:
-                        error = discord.Embed(title="Invalid parameter %s" % list_result[2], description="Must be 'level' or 'exp'", color=0xda000f)
-                        error.set_footer(text="!remove <number> <category> <@person>")
-                        await message.channel.send(embed=error)
-                        return 0
-                    try:
-                        message.mentions[0]
-                    except IndexError:
-                        error = discord.Embed(title="Invalid parameter %s" % list_result[3], description="Must be a mention. \n ps: you can't copy mentions", color=0xda000f)
-                        error.set_footer(text="!remove <number> <category> <@person>")
-                        await message.channel.send(embed=error)
-                        return 0
-
-                    cursor.execute("SELECT username from levels_table")
-                    result = cursor.fetchall()
-                    try:
-                        for b in result:
-                            for t in b:
-                                if t in str(message.mentions[0]):
-                                    cursor.execute("SELECT user_id FROM levels_table WHERE username = '%s'" % str(t))
-                                    res = cursor.fetchone()
-                                    for a in res:
-                                        list_result[3] = a
-                    except IndexError:
-                        error = discord.Embed(title="IndexError", description="Invalid username", color=0xda000f)
-                        error.set_footer(text="Raised when a sequence subscript is out of range. (Slice indices are silently truncated to fall in the allowed range; if an index is not a plain integer, TypeError is raised.)")
-                        await message.channel.send(embed=error)
-                        return 0
-
-                    cursor.execute("SELECT %s FROM levels_table WHERE user_id = '%s'" % (list_result[2], list_result[3]))
-                    res = cursor.fetchone()
-                    for a in res:
-                        list_result[0] = a - int(list_result[1]) # From command name list_result switches to updated amount
-                        if list_result[0] < 0:
-                            list_result[0] = 0
-
-                    if list_result[2] == 'level':
-                        cursor.execute("UPDATE levels_table SET %s = %s WHERE user_id = '%s'" % (list_result[2], list_result[0], list_result[3]))
-                        mariadb_connection.commit()
-                        cursor.execute(getMaxExp % list_result[3])
-
-                        b = cursor.fetchone()[0]
-                        for i in range(0, int(list_result[1])):
-                            if b<100:
-                                b = 100
+                        level = {}
+                        i = -1
+                        check3 = 0
+                        for i, level in enumerate(levelingList):
+                            if str(message.mentions[0]) == level["username"]:
+                                check3 = 1
                                 break
-                            b -= 25
-                        cursor.execute("UPDATE levels_table SET maxXp = %s WHERE user_id = '%s'" % (b, list_result[3]))
+                        if check3 == 0:
+                            error = discord.Embed(title="Invalid parameter %s" % userMsgList[2], description="User doesn't exist in database \n ps: you can't copy mentions", color=0xda000f)
+                            error.set_footer(text="<command name>  <category> <@person>")
+                            await message.channel.send(embed=error)
+                            return
 
-                        cursor.execute("SELECT exp FROM levels_table WHERE user_id = '%s'" % list_result[3])
-                        result = cursor.fetchone()[0]
-                        if result > b:
-                            cursor.execute("UPDATE levels_table SET exp = 0 WHERE user_id = '%s'" % list_result[3])
+                        del check3
 
-                    elif list_result[2] == 'exp':
-                        cursor.execute("UPDATE levels_table SET exp = %s WHERE user_id = '%s'" % (list_result[0], list_result[3]))
+                        # clear category
+                        try:
+                            level[userMsgList[1]] = 0
+                        except error:  # if userMsgList[1] is "all", then its not in level, but for some reason it doesnt give an error
+                            if userMsgList[1] == "all":
+                                level["level"] = 0
+                                level["exp"] = 0
+                                level["maxXp"] = 25
+                                level["msges_sent"] = 0
 
-                    mariadb_connection.commit()
+                        if userMsgList[1] == "all":
+                            level["level"] = 0
+                            level["exp"] = 0
+                            level["maxXp"] = 25
+                            level["msges_sent"]
 
-                    await message.channel.send("removed %s %s from <@%s>" % (list_result[1], list_result[2], list_result[3]))
-                else:
-                    if len(list_result) < 4:
-                        error = discord.Embed(title="Not enough parameters", description="'!add' command needs 3 parameters", color=0xda000f)
+                        if userMsgList[1] == "level":
+                            level["maxXp"] = 25
+                            level["exp"] = 1
+                        levelingList[i] = level
                     else:
-                        error = discord.Embed(title="Too many parameters", description="'!add' command needs 3 parameters", color=0xda000f)
-                    error.set_footer(text="!remove <number> <category> <@person>")
+                        for b, level in enumerate(levelingList):
+                            try:
+                                level[userMsgList[1]] = 0
+                            except error:  # if userMsgList[1] is "all", then its not in level, but for some reason it doesnt give an error
+                                if userMsgList[1] == "all":
+                                    level["level"] = 0
+                                    level["exp"] = 0
+                                    level["maxXp"] = 25
+                                    level["msges_sent"] = 0
+
+                            if userMsgList[1] == "all":
+                                level["level"] = 0
+                                level["exp"] = 0
+                                level["maxXp"] = 25
+                                level["msges_sent"]
+
+                            if userMsgList[1] == "level":
+                                level["maxXp"] = 25
+                                level["exp"] = 1
+
+                            levelingList[b] = level
+                    await message.channel.send("success")
+                    SortListOfDict()
+                    AddRanks()
+                    UpdateLevelingTable()
+                else:
+                    if len(userMsgList) < 3:
+                        error = discord.Embed(title="Not enough parameters", description="'!clear' command uses 2 parameters", color=0xda000f)
+                    else:
+                        error = discord.Embed(title="Too many parameters", description="'!clear' command uses 2 parameters", color=0xda000f)
+                    error.set_footer(text="!clear <number> <category> <@person>")
                     await message.channel.send(embed=error)
-                    return 0
+                    return
             else:
                 error = discord.Embed(title="Invalid permissions", description="Only administrators have access to this command", color=0xda000f)
                 error.set_footer(text="!add <number> <category> <@person>")
                 await message.channel.send(embed=error)
                 return 0
-#
-#
-#
-        if message.content.startswith("!clear"):
-            if getattr(message.author.guild_permissions, "administrator"):
-                list_result = message.content.split()
-                if len(list_result) == 3:
-                    valid_categories = ['exp', 'level', 'msges', 'all']
-                    if list_result[1] in valid_categories:
-                        try:
-                            message.mentions[0]
-                        except IndexError:
-                            error = discord.Embed(title="Invalid parameter %s" % list_result[2], description="Must be a mention. \n ps: you can't copy mentions", color=0xda000f)
-                            error.set_footer(text="!clear <category> <@mention>")
-                            await message.channel.send(embed=error)
-                            return 0
-
-                        cursor.execute("SELECT username from levels_table")
-                        result = cursor.fetchall()
-
-                        try:
-                            for b in result:
-                                for t in b:
-                                    if t in str(message.mentions[0]):
-                                        cursor.execute("SELECT user_id FROM levels_table WHERE username = '%s'" % str(t))
-                                        res = cursor.fetchone()
-                                        for a in res:
-                                            list_result[2] = int(a)
-                        except IndexError:
-                            error = discord.Embed(title="IndexError", description="Invalid username", color=0xda000f)
-                            error.set_footer(text="Raised when a sequence subscript is out of range. (Slice indices are silently truncated to fall in the allowed range; if an index is not a plain integer, TypeError is raised.)")
-                            await message.channel.send(embed=error)
-                            return 0
-                        print(list_result)
-                        if list_result[1] == 'level':
-                            cursor.execute("UPDATE levels_table SET %s = 0 WHERE user_id = '%s'" % (list_result[1], list_result[2]))
-                            cursor.execute("UPDATE levels_table SET exp = 0 WHERE user_id = '%s'" % (list_result[2]))
-                            cursor.execute("UPDATE levels_table SET maxXp = 100 WHERE user_id = '%s'" % (list_result[2]))
-                        elif list_result[1] == 'exp':
-                            cursor.execute("UPDATE levels_table SET %s = 0 WHERE user_id = '%s'" % (list_result[1], list_result[2]))
-                        elif list_result[1] == 'msges':
-                            cursor.execute("UPDATE levels_table SET %s = 0 WHERE user_id = '%s'" % (list_result[1], list_result[2]))
-                        elif list_result[1] == 'all':
-                            cursor.execute("UPDATE levels_table SET level = 0 WHERE user_id = '%s'" % (list_result[2]))
-                            cursor.execute("UPDATE levels_table SET exp = 0 WHERE user_id = '%s'" % (list_result[2]))
-                            cursor.execute("UPDATE levels_table SET maxXp = 100 WHERE user_id = '%s'" % (list_result[2]))
-                            cursor.execute("UPDATE levels_table SET msges_sent = 0 WHERE user_id = '%s'" % (list_result[2]))
-                        mariadb_connection.commit()
-                        await message.channel.send("Cleared %s" % list_result[1])
-                    else:
-                        error = discord.Embed(title="Invalid parameter %s" % list_result[1], description="Must be 'level', 'exp' or 'msges'", color=0xda000f)
-                        error.set_footer(text="!clear <category> <@mention>")
-                        await message.channel.send(embed=error)
-                        return 0
-                else:
-                    if len(list_result) < 3:
-                        error = discord.Embed(title="Not enough parameters", description="'!add' command needs 3 parameters", color=0xda000f)
-                    else:
-                        error = discord.Embed(title="Too many parameters", description="'!add' command needs 3 parameters", color=0xda000f)
-                        error.set_footer(text="!clear <category> <@mention>")
-                        await message.channel.send(embed=error)
-                        return 0
-
-
-
-            else:
-                error = discord.Embed(title="Invalid permissions", description="Only administrators have access to this command", color=0xda000f)
-                error.set_footer(text="!clear <category> <@mention>")
-                await message.channel.send(embed=error)
-                return 0
-
-
-
-
 client.run(token)
