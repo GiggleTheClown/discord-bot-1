@@ -7,7 +7,7 @@ host = 'localhost'
 user = 'root'
 password = 'root'
 database = 'test'
-
+keys = ['user_id', 'msges_sent', 'exp', 'maxXp', 'level', 'username', 'rank', 'user_avatar_url', 'prestige']
 
 def home(request):
     return render(request, 'home/home.html')
@@ -28,7 +28,6 @@ def leveling(request):
 
     cursor.execute("SELECT * FROM levels_table ORDER BY rank ASC")
     rows = cursor.fetchall()
-    keys = ['user_id', 'msges_sent', 'exp', 'maxXp', 'level', 'username', 'rank', 'user_avatar_url']
     listOfDicts = []
     for i in rows:
         listOfDicts.append(convertToDict(keys, i))
@@ -49,7 +48,7 @@ def detail(request, user_id):
     cursor = mariadb_connection.cursor()
     cursor.execute("SELECT * FROM levels_table WHERE user_id = '%s'" % user_id)
     rows = cursor.fetchall()
-    keys = ['user_id', 'msges_sent', 'exp', 'maxXp', 'level', 'username', 'rank', 'user_avatar_url']
+
     listOfDicts = []
     for i in rows:
         listOfDicts.append(convertToDict(keys, i))

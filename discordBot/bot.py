@@ -9,7 +9,7 @@ import threading
 def BackupDatabase():
     os.system('mysqldump -u %s -p%s %s > backup.sql' % (user, password, database))
     print("Backup done")
-    timer = threading.Timer(10000.0, BackupDatabase())
+    timer = threading.Timer(1000.0, BackupDatabase)
     timer.start()
 
 
@@ -33,10 +33,11 @@ def UpdateLevelingTable():
     mariadb_connection.commit()
 
 
-def ExpGain(msgLen):
+def ExpGain(msgLen, prestigeLevel):
     random.seed(datetime.now())
     try:
-        return random.randint(1, DeteriorateXp(msgLen))
+        expAmount = random.randint(1, DeteriorateXp(msgLen))
+        return round(expAmount + (expAmount/20)*prestigeLevel, 3)
     except ValueError:
         return random.randint(1, 15)
 
@@ -66,9 +67,21 @@ def SortListOfDict(): # Bubble sort used because assuming everyhing is sorted, i
 
         for j in range(0, n-i-1):
 
-            if (levelingList[j]["level"] < levelingList[j+1]["level"]) or (levelingList[j]["level"] == levelingList[j+1]["level"] and levelingList[j]["exp"] < levelingList[j+1]["exp"]):
+            if levelingList[j]["prestige"] < levelingList[j+1]["prestige"]:
                 levelingList[j], levelingList[j+1] = levelingList[j+1], levelingList[j]
                 returnval = 1
+            elif levelingList[j]["prestige"] == levelingList[j+1]["prestige"]:
+                if levelingList[j]["level"] < levelingList[j+1]["level"]:
+                    levelingList[j], levelingList[j+1] = levelingList[j+1], levelingList[j]
+                    returnval = 1
+                elif levelingList[j]["level"] == levelingList[j+1]["level"]:
+                    if levelingList[j]["exp"] < levelingList[j+1]["exp"]:
+                        levelingList[j], levelingList[j+1] = levelingList[j+1], levelingList[j]
+                        returnval = 1
+                    elif levelingList[j]["exp"] == levelingList[j+1]["exp"]:
+                        if levelingList[j]["msges_sent"] < levelingList[j]["msges_sent"]:
+                            levelingList[j], levelingList[j+1] = levelingList[j+1], levelingList[j]
+                            returnval = 1
     return returnval
 
 
@@ -120,20 +133,21 @@ insert = "INSERT INTO levels_table (user_id, msges_sent, exp, maxXp, level, user
 cursor.execute("SELECT * FROM levels_table ORDER BY rank ASC")
 rows = cursor.fetchall()
 global keys
-keys = ['user_id', 'msges_sent', 'exp', 'maxXp', 'level', 'username', 'rank', 'user_avatar_url']
+keys = ['user_id', 'msges_sent', 'exp', 'maxXp', 'level', 'username', 'rank', 'user_avatar_url', 'prestige']
 global levelingList
 levelingList = []
 for i in rows:
     levelingList.append(ConvertToDict(keys, i))
 
 
-token = "NzAzMzM1Mjg0MjEzMDIyODEy.XuZQMw.wkna9KnENg-_T3lbUr7GyWZ7yjc"
+token = "Im a fake token"
 
 client = discord.Client()
 id = client.get_guild(548520910764769280)
 
-timer = threading.Timer(10000.0, BackupDatabase)
+timer = threading.Timer(300.0, BackupDatabase)
 timer.start()
+
 
 @client.event
 async def on_message(message):
@@ -145,25 +159,28 @@ async def on_message(message):
             except TypeError:
                 level["user_avatar_url"] = "-1"
             level["msges_sent"] += 1
-            level["exp"] += ExpGain(len(message.content))
+            level["exp"] += ExpGain(len(message.content), level["prestige"])
+
             if level["exp"] >= level["maxXp"]:
                 level["level"] += 1
                 await message.channel.send("%s is now level %s" % ("<@"+level["user_id"]+">", level["level"]))
                 level["exp"] -= level["maxXp"]
                 level["maxXp"] += IncreaseMaxExp(level["maxXp"])
+            level["exp"] = round(level["exp"], 3)
             levelingList[i] = level
             if SortListOfDict():
                 AddRanks()
                 UpdateLevelingTable()
             else:
-                UpdateLevelingTableRow(levelingList[i])
+                UpdateLevelingTableRow(levelingList[i])  # so that it doesnt update the whole table every msg
+            break
 
         # Create user if doesnt exist
 
         if i == len(levelingList):
-            cursor.execute(insert % (message.author.id, 1, 0, 100, 0, str(message.author), 0, '-1'))
+            cursor.execute(insert % (message.author.id, 1, 0, 100, 0, str(message.author), 0, '-1', 0))
             mariadb.commit()
-            mem = {"user_id": message.author.id, "msges_sent": 1, "exp": 0, "maxXp": 100, "level": 0, "username": str(message.author), "rank": len(levelingList)+1, "user_avatar_url": -1}
+            mem = {keys[0]: message.author.id, keys[1]: 1, keys[2]: 0, keys[3]: 100, keys[4]: 0, keys[5]: str(message.author), keys[6]: len(levelingList)+1, keys[7]: -1, keys[8]: 0}
             levelingList.append(mem)
 
     # diffrent commands
@@ -175,7 +192,7 @@ async def on_message(message):
             for i, level in enumerate(levelingList):
                 if i == 5:
                     break
-                embed.add_field(name=level["username"], value="rank - %s l‎evel - %s xp - %s/%s" % ("#"+str(level["rank"]), str(level["level"]), str(level["exp"]), str(level["maxXp"])), inline=False)
+                embed.add_field(name=level["username"], value="rank - %s \u200b \u200b prestige - %s level - %s" % ("#"+str(level["rank"]), level["prestige"], level["level"]), inline=False)
             await message.channel.send(embed=embed)
 #
 #
@@ -203,10 +220,12 @@ async def on_message(message):
                 embed.set_author(name=level["username"])
                 embed.set_thumbnail(url=level["user_avatar_url"])
                 embed.add_field(name="rank‏‏‎ ‎‏‏‎ ‎", value="#"+str(level["rank"]), inline=True)
+                embed.add_field(name="prestige ", value=level["prestige"], inline=True)
+                embed.add_field(name="\u200b", value="\u200b", inline=True)
                 embed.add_field(name="lvl", value=level["level"], inline=True)
+                embed.add_field(name="exp", value=str(level["exp"])+"/"+str(level["maxXp"]), inline=True)
                 embed.add_field(name="\u200b", value="\u200b", inline=True)
                 embed.add_field(name="msgs‏‏‎ ‎‏‏‎ ‎", value=level["msges_sent"], inline=True)
-                embed.add_field(name="exp", value=str(level["exp"])+"/"+str(level["maxXp"]), inline=True)
                 embed.add_field(name="\u200b", value="\u200b", inline=True)
                 embed.set_footer(text="<@%s>" % (level["user_id"]))
             except IndexError:
@@ -222,15 +241,7 @@ async def on_message(message):
                 error.set_footer(text="Invalid Form Body In embed.thumbnail.url: Not a well formed URL.")
                 await message.channel.send(embed=error)
 
-                embed = discord.Embed(title="!level", description="Shows level info‏‏‎‎", color=random.randint(0, 0xFFFFFF))
-                embed.set_author(name=level["username"])
-                embed.add_field(name="rank‏‏‎ ‎‏‏‎ ‎", value="#"+str(level["rank"]), inline=True)
-                embed.add_field(name="lvl", value=level["level"], inline=True)
-                embed.add_field(name="\u200b", value="\u200b", inline=True)
-                embed.add_field(name="msgs‏‏‎ ‎‏‏‎ ‎", value=level["msges_sent"], inline=True)
-                embed.add_field(name="exp", value=str(level["exp"])+"/"+str(level["maxXp"]), inline=True)
-                embed.add_field(name="\u200b", value="\u200b", inline=True)
-                embed.set_footer(text="<@%s>" % (level["user_id"]))
+                embed.set_thumbnail(url="")
                 try:
                     await message.channel.send(embed=embed)
                 except IndexError:
@@ -259,9 +270,9 @@ async def on_message(message):
                         await message.channel.send(embed=error)
                         return
                     # check [2]
-                    validCategories = ["exp", "level", "msges_sent"]
+                    validCategories = ["exp", "level", "msges_sent", "prestige"]
                     if userMsgList[2] not in validCategories:
-                        error = discord.Embed(title="Invalid parameter %s" % userMsgList[2], description="Must be 'level', 'exp' or 'msges_sent'", color=0xda000f)
+                        error = discord.Embed(title="Invalid parameter %s" % userMsgList[2], description="Must be 'prestige', 'level', 'exp' or 'msges_sent'", color=0xda000f)
                         error.set_footer(text="<command name> <number> <category> <@person>")
                         await message.channel.send(embed=error)
                         return
@@ -289,13 +300,14 @@ async def on_message(message):
                     del check3
 
                     # add/remove to levelingList and databases and polish diffrent scenarios
+                    userMsgList[1] = int(userMsgList[1])
                     if "add" in message.content:
-                        level[userMsgList[2]] += int(userMsgList[1])
+                        level[userMsgList[2]] += userMsgList[1]
 
                     # increase maxXp if added levels
 
                         if userMsgList[2] == "level":
-                            for b in range(int(userMsgList[1])):
+                            for b in range(userMsgList[1]):
                                 level["maxXp"] += IncreaseMaxExp(level["maxXp"])
 
                     # see if new exp causes leveling up
@@ -307,13 +319,13 @@ async def on_message(message):
                                 level["maxXp"] += IncreaseMaxExp(level["maxXp"])
 
                     if "remove" in message.content:
-                        level[userMsgList[2]] -= int(userMsgList[1])
+                        level[userMsgList[2]] -= userMsgList[1]
 
                         if level[userMsgList[2]] < 0:
                             level[userMsgList[2]] = 0
                         # when removing levels decrease maxXp and negate exp
                         if userMsgList[2] == "level":
-                            for b in range(int(userMsgList[1])):
+                            for b in range(userMsgList[1]):
                                 level["maxXp"] -= IncreaseMaxExp(level["maxXp"]-1)
                                 if level["maxXp"] < 0:
                                     level["maxXp"] = 0
@@ -322,7 +334,6 @@ async def on_message(message):
                             level["exp"] = 0
                         # when removing exp, lower levels and maxXp
                         if userMsgList[2] == "exp":
-                            userMsgList[1] = int(userMsgList[1])
                             if userMsgList[1] > 0:
                                 level["maxXp"] -= IncreaseMaxExp(level["maxXp"]-1)
                                 level["level"] -= 1
@@ -372,7 +383,7 @@ async def on_message(message):
                 userMsgList = message.content.split()
                 if len(userMsgList) == 3:
                     # [1] check
-                    validCategories = ["msges_sent", "exp", "level", "all"]
+                    validCategories = ["msges_sent", "exp", "level", "prestige", "all"]
                     if userMsgList[1] not in validCategories:
                         error = discord.Embed(title="Invalid parameter %s" % userMsgList[1], description="Must be 'level', 'exp' or 'msges_sent'", color=0xda000f)
                         error.set_footer(text="<command name> <category> <@person>")
@@ -413,12 +424,14 @@ async def on_message(message):
                                 level["exp"] = 0
                                 level["maxXp"] = 25
                                 level["msges_sent"] = 0
+                                level["prestige"] = 0
 
                         if userMsgList[1] == "all":
                             level["level"] = 0
                             level["exp"] = 0
                             level["maxXp"] = 25
-                            level["msges_sent"]
+                            level["msges_sent"] = 0
+                            level["prestige"] = 0
 
                         if userMsgList[1] == "level":
                             level["maxXp"] = 25
@@ -434,12 +447,14 @@ async def on_message(message):
                                     level["exp"] = 0
                                     level["maxXp"] = 25
                                     level["msges_sent"] = 0
+                                    level["prestige"] = 0
 
                             if userMsgList[1] == "all":
                                 level["level"] = 0
                                 level["exp"] = 0
                                 level["maxXp"] = 25
-                                level["msges_sent"]
+                                level["msges_sent"] = 0
+                                level["prestige"] = 0
 
                             if userMsgList[1] == "level":
                                 level["maxXp"] = 25
@@ -462,5 +477,32 @@ async def on_message(message):
                 error = discord.Embed(title="Invalid permissions", description="Only administrators have access to this command", color=0xda000f)
                 error.set_footer(text="!add <number> <category> <@person>")
                 await message.channel.send(embed=error)
-                return 0
+                return
+
+        if message.content == "!prestige":
+            # each prestige increases ur exp gain by 5%
+            level = {}
+            for i, level in enumerate(levelingList):
+                if level["user_id"] == str(message.author.id):
+                    # check if u have required levels to prestige
+                    if level["level"] >= 100 + 20*level["prestige"]:  # you can prestige every 20 levels after 100
+                        # erase all other stats except msges sent but increase prestige
+                        level["level"] = 0
+                        level["exp"] = 0
+                        level["maxXp"] = 0
+                        level["prestige"] += 1
+                        levelingList[i] = level
+                        SortListOfDict()
+                        AddRanks()
+                        UpdateLevelingTable()
+                        await message.channel.send("<@%s> prestiged to %s" % (level["user_id"], level["prestige"]))
+                    else:
+                        await message.channel.send("You need %s more levels untill you can prestige" % ((100 + 20*level["prestige"]) - level["level"]))
+
+                    break
+
+                if i == len(levelingList):
+                    await message.channel.send("error")
+
+
 client.run(token)
